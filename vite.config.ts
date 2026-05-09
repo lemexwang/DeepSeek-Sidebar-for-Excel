@@ -28,5 +28,11 @@ export default defineConfig({
           cert: fs.readFileSync(path.join(certPath, 'localhost.crt')),
         }
       : undefined,
+    proxy: {
+      '/v1': {
+        target: 'http://localhost:14002',
+        changeOrigin: true,
+      },
+    },
   },
 });

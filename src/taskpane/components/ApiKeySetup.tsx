@@ -12,12 +12,7 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
 
   const handleSubmit = () => {
     if (!apiKey.trim()) {
-      setError('Please enter an API key');
-      return;
-    }
-
-    if (!apiKey.startsWith('sk-ant-')) {
-      setError('Invalid API key format. Should start with sk-ant-');
+      setError('Please enter a key value');
       return;
     }
 
@@ -41,8 +36,8 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
               <path d="M4 24L24 34L44 24" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
             </svg>
           </div>
-          <h1>Welcome to Claude for Excel</h1>
-          <p>Get started by entering your Anthropic API key</p>
+          <h1>Welcome to Gemma for Excel</h1>
+          <p>Running locally via Gemma proxy — enter any value to continue</p>
         </div>
 
         <div className="setup-form">
@@ -53,7 +48,7 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
           >
             <Input
               type="password"
-              placeholder="sk-ant-..."
+              placeholder="gemma-local"
               value={apiKey}
               onChange={(_, data) => {
                 setApiKey(data.value);
@@ -75,14 +70,8 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
           </Button>
 
           <div className="setup-help">
-            <p className="help-text">
-              Don't have an API key?{' '}
-              <a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer">
-                Get one from Anthropic
-              </a>
-            </p>
             <p className="help-note">
-              Your API key is stored securely in your Excel workbook settings and is never shared.
+              This add-in connects to your local Gemma proxy at localhost:14001. Any value works as the key.
             </p>
           </div>
         </div>
