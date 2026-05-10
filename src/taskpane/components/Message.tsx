@@ -50,11 +50,12 @@ export default function Message({ message, onRegenerate }: MessageProps) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({ node, inline, className, children, ...props }) {
+                code({ node, className, children, ...props }) {
                   const match = /language-(\w+)/.exec(className || '');
                   const codeString = String(children).replace(/\n$/, '');
+                  const isBlock = !!match || codeString.includes('\n');
 
-                  return !inline ? (
+                  return isBlock ? (
                     <CodeBlock code={codeString} language={match ? match[1] : 'text'} />
                   ) : (
                     <code className={className} {...props}>

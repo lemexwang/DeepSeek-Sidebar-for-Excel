@@ -123,18 +123,19 @@ export function useExcelContext() {
     updateContext();
 
     // Set up event handler
-    let handlerId: string | null = null;
+    type SelectionHandler = (args: Excel.WorksheetSelectionChangedEventArgs) => Promise<void>;
+    let selectionHandler: SelectionHandler | null = null;
 
     const setupEventHandler = async () => {
       try {
         await Excel.run(async (context) => {
           const sheet = context.workbook.worksheets.getActiveWorksheet();
-          const eventResult = sheet.onSelectionChanged.add(() => {
+          selectionHandler = async (_args: Excel.WorksheetSelectionChangedEventArgs) => {
             // Use a small delay to debounce rapid selection changes
             setTimeout(updateContext, 100);
-          });
+          };
+          sheet.onSelectionChanged.add(selectionHandler);
           await context.sync();
-          handlerId = eventResult.value;
           console.log('[ExcelContext] Selection change listener registered');
         });
       } catch (error) {
@@ -146,11 +147,11 @@ export function useExcelContext() {
 
     // Cleanup
     return () => {
-      if (handlerId) {
+      if (selectionHandler) {
         Excel.run(async (context) => {
           try {
             const sheet = context.workbook.worksheets.getActiveWorksheet();
-            sheet.onSelectionChanged.remove(handlerId!);
+            sheet.onSelectionChanged.remove(selectionHandler!);
             await context.sync();
             console.log('[ExcelContext] Selection change listener removed');
           } catch (error) {

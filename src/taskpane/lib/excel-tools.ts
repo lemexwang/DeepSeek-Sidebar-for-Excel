@@ -935,4 +935,16 @@ export const excelTools: ExcelTool[] = [
       },
     },
   },
+  {
+    name: 'web_search',
+    description: 'Search the web for current information (exchange rates, prices, news, weather, etc.)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'The search query' },
+        max_results: { type: 'number', description: 'Maximum number of results (default: 3, max: 8)' },
+      },
+      required: ['query'],
+    },
+  },
 ];

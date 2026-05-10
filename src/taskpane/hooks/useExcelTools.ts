@@ -8,6 +8,13 @@ export function useExcelTools() {
   const executeTool = useCallback(async (toolName: string, input: any): Promise<ToolExecutionResult> => {
     try {
       // Handle web search separately (doesn't require Excel context)
+      if (toolName === 'web_search') {
+        const n = Math.min(input.max_results || 3, 8);
+        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=${n}`);
+        if (!res.ok) return { success: false, error: `Search failed: ${res.status}` };
+        return await res.json();
+      }
+
       return await Excel.run(async (context) => {
         switch (toolName) {
           case 'read_range': {
@@ -449,12 +456,11 @@ export function useExcelTools() {
 
           case 'apply_autofilter': {
             const sheet = context.workbook.worksheets.getActiveWorksheet();
-            const range = sheet.getRange(input.range);
 
             if (input.remove) {
-              range.autoFilter.remove();
+              sheet.autoFilter.remove();
             } else {
-              range.autoFilter.apply(range);
+              sheet.autoFilter.apply(sheet.getRange(input.range));
             }
 
             await context.sync();
@@ -533,13 +539,10 @@ export function useExcelTools() {
           case 'add_comment': {
             const sheet = context.workbook.worksheets.getActiveWorksheet();
             const cell = sheet.getRange(input.cell);
+            cell.load('address');
+            await context.sync();
 
-            const comment = cell.comment;
-            comment.content = input.comment;
-            if (input.author) {
-              comment.authorName = input.author;
-            }
-
+            context.workbook.comments.add(cell.address, input.comment, Excel.ContentType.plain);
             await context.sync();
 
             return {
@@ -716,7 +719,7 @@ export function useExcelTools() {
                 right: 'EdgeRight',
               };
 
-              const borderName = borderNames[input.borderType];
+              const borderName = borderNames[input.borderType] as Excel.BorderIndex;
               range.format.borders.getItem(borderName).style = style;
               range.format.borders.getItem(borderName).weight = weight;
               range.format.borders.getItem(borderName).color = color;

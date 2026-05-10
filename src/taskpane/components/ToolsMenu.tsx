@@ -25,14 +25,18 @@ export default function ToolsMenu({ messages = [] }: ToolsMenuProps) {
     try {
       await Excel.run(async (context) => {
         const sheet = context.workbook.worksheets.getActiveWorksheet();
-        const freezePanes = sheet.freezePanes;
-        freezePanes.load(['rows', 'columns']);
+        const location = sheet.freezePanes.getLocationOrNullObject();
+        location.load('rowIndex,columnIndex');
         await context.sync();
 
-        setFreezeState({
-          topRowFrozen: freezePanes.rows > 0,
-          firstColumnFrozen: freezePanes.columns > 0,
-        });
+        if (location.isNullObject) {
+          setFreezeState({ topRowFrozen: false, firstColumnFrozen: false });
+        } else {
+          setFreezeState({
+            topRowFrozen: location.rowIndex > 0,
+            firstColumnFrozen: location.columnIndex > 0,
+          });
+        }
       });
     } catch (error) {
       console.error('Error checking freeze state:', error);
