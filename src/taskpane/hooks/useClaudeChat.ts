@@ -107,8 +107,16 @@ export function useClaudeChat(apiKey: string) {
         const stream = anthropic.messages.stream(
           {
             model: 'deepseek-chat',
-            max_tokens: 4096,
-            system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\nToday's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
+            max_tokens: 8192,
+            system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\n
+
+WEB SEARCH RULES (strictly follow):
+- Call web_search AT MOST 2 times per user request. Once you have any results, use them immediately.
+- Do NOT search again to verify, enrich, or supplement results you already have.
+- If the first search returns partial data, that is enough — proceed to complete the task.
+- If a search returns empty results, try ONE shorter/simpler query, then proceed without web data.
+
+Today's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
             tools: tools as any,
             messages: conversationMessages as any,
           },
@@ -154,6 +162,8 @@ export function useClaudeChat(apiKey: string) {
         }
 
         // Handle tool use if needed
+        let searchCount = 0;
+        const MAX_SEARCHES = 3;
         while (response.stop_reason === 'tool_use') {
           // Find all tool_use blocks in the response
           const toolUseBlocks = response.content.filter(
@@ -179,7 +189,17 @@ export function useClaudeChat(apiKey: string) {
           // Execute all tools and collect results
           const toolResults = await Promise.all(
             toolUseBlocks.map(async (toolUseBlock: any) => {
-              const result = await executeTool(toolUseBlock.name, toolUseBlock.input);
+              let result;
+              if (toolUseBlock.name === 'web_search') {
+                if (searchCount >= MAX_SEARCHES) {
+                  result = { error: 'Search limit reached. Use the information already retrieved to complete the task now.' };
+                } else {
+                  searchCount++;
+                  result = await executeTool(toolUseBlock.name, toolUseBlock.input);
+                }
+              } else {
+                result = await executeTool(toolUseBlock.name, toolUseBlock.input);
+              }
               return {
                 type: 'tool_result' as const,
                 tool_use_id: toolUseBlock.id,
@@ -201,8 +221,16 @@ export function useClaudeChat(apiKey: string) {
           const continueStream = anthropic.messages.stream(
             {
               model: 'deepseek-chat',
-              max_tokens: 4096,
-              system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\nToday's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
+              max_tokens: 8192,
+              system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\n
+
+WEB SEARCH RULES (strictly follow):
+- Call web_search AT MOST 2 times per user request. Once you have any results, use them immediately.
+- Do NOT search again to verify, enrich, or supplement results you already have.
+- If the first search returns partial data, that is enough — proceed to complete the task.
+- If a search returns empty results, try ONE shorter/simpler query, then proceed without web data.
+
+Today's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
               tools: tools as any,
               messages: conversationMessages as any,
             },
