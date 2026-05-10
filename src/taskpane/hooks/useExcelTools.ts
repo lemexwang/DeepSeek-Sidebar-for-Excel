@@ -9,15 +9,9 @@ export function useExcelTools() {
     try {
       // Handle web search separately (doesn't require Excel context)
       if (toolName === 'web_search') {
-        // The Anthropic API with extended thinking will handle the actual search
-        // We just need to acknowledge the tool use
-        return {
-          success: true,
-          data: {
-            query: input.query,
-            note: 'Web search executed. Results integrated into response.',
-          },
-        };
+        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=5`);
+        const data = await res.json();
+        return { success: true, results: data.results ?? [] };
       }
 
       return await Excel.run(async (context) => {

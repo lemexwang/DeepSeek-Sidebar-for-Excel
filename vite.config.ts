@@ -33,6 +33,10 @@ export default defineConfig({
         target: 'http://localhost:14002',
         changeOrigin: true,
       },
+      '/search': {
+        target: 'http://localhost:14002',
+        changeOrigin: true,
+      },
     },
   },
 });
