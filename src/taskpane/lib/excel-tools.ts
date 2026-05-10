@@ -2,20 +2,6 @@ import type { ExcelTool } from './types';
 
 export const excelTools: ExcelTool[] = [
   {
-    name: 'web_search',
-    description: 'Search the web for current information, historical data, exchange rates, prices, or any real-time information. Use this when you need up-to-date information that you don\'t have in your training data, such as current exchange rates, recent events, pricing information, or to verify facts.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'The search query. Be specific and include dates when searching for historical information (e.g., "EUR to USD exchange rate on 2024-01-15")',
-        },
-      },
-      required: ['query'],
-    },
-  },
-  {
     name: 'read_range',
     description: 'Read values from a range of cells in Excel. Returns the values, formulas, and number formats.',
     input_schema: {

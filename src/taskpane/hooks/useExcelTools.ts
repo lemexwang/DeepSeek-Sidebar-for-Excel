@@ -8,12 +8,6 @@ export function useExcelTools() {
   const executeTool = useCallback(async (toolName: string, input: any): Promise<ToolExecutionResult> => {
     try {
       // Handle web search separately (doesn't require Excel context)
-      if (toolName === 'web_search') {
-        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=3`);
-        const data = await res.json();
-        return { success: true, results: data.results ?? [] };
-      }
-
       return await Excel.run(async (context) => {
         switch (toolName) {
           case 'read_range': {
