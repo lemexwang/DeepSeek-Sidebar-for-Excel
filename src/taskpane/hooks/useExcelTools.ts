@@ -1283,6 +1283,41 @@ export function useExcelTools() {
             };
           }
 
+          case 'debug_formula_errors': {
+            const sheet = input.worksheet
+              ? context.workbook.worksheets.getItem(input.worksheet)
+              : context.workbook.worksheets.getActiveWorksheet();
+
+            const targetRange = input.range
+              ? sheet.getRange(input.range)
+              : sheet.getUsedRange();
+            targetRange.load('values, formulas, address, rowIndex, columnIndex, rowCount, columnCount');
+            await context.sync();
+
+            const errorTypes = new Set(['#REF!', '#VALUE!', '#NAME?', '#DIV/0!', '#N/A', '#NULL!', '#NUM!']);
+            const errors: { cell: string; error: string; formula: string }[] = [];
+
+            for (let r = 0; r < targetRange.rowCount; r++) {
+              for (let c = 0; c < targetRange.columnCount; c++) {
+                const val = String(targetRange.values[r][c]);
+                if (errorTypes.has(val)) {
+                  const colLetter = String.fromCharCode(65 + targetRange.columnIndex + c);
+                  const rowNum = targetRange.rowIndex + r + 1;
+                  errors.push({
+                    cell: `${colLetter}${rowNum}`,
+                    error: val,
+                    formula: String(targetRange.formulas[r][c]),
+                  });
+                }
+              }
+            }
+
+            return {
+              success: true,
+              data: { errorCount: errors.length, errors },
+            };
+          }
+
           default:
             return {
               success: false,

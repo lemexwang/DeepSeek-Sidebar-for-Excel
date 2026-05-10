@@ -932,4 +932,21 @@ export const excelTools: ExcelTool[] = [
       required: ['range'],
     },
   },
+  {
+    name: 'debug_formula_errors',
+    description: 'Scan a range for formula errors (#REF!, #VALUE!, #NAME!, #DIV/0!, #N/A, #NULL!, #NUM!) and return each cell address, error type, and the formula causing it. Use this to identify and help fix broken formulas.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        range: {
+          type: 'string',
+          description: 'Range to scan for errors (e.g., "A1:Z100"). Scans the entire used range if not specified.',
+        },
+        worksheet: {
+          type: 'string',
+          description: 'Worksheet name (optional, uses active sheet if not specified)',
+        },
+      },
+    },
+  },
 ];
