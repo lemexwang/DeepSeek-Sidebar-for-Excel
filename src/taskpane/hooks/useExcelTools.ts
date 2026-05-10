@@ -10,7 +10,7 @@ export function useExcelTools() {
       // Handle web search separately (doesn't require Excel context)
       if (toolName === 'web_search') {
         const n = Math.min(input.max_results || 3, 8);
-        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=${n}`);
+        const res = await fetch(`http://localhost:14002/search?q=${encodeURIComponent(input.query)}&n=${n}`);
         if (!res.ok) return { success: false, error: `Search failed: ${res.status}` };
         return await res.json();
       }
