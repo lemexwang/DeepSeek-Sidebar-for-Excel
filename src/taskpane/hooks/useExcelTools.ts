@@ -9,7 +9,7 @@ export function useExcelTools() {
     try {
       // Handle web search separately (doesn't require Excel context)
       if (toolName === 'web_search') {
-        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=5`);
+        const res = await fetch(`/search?q=${encodeURIComponent(input.query)}&n=3`);
         const data = await res.json();
         return { success: true, results: data.results ?? [] };
       }
