@@ -1,3 +1,4 @@
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage } from '../lib/types';
@@ -15,71 +16,44 @@ interface MessageProps {
 
 export default function Message({ message, onRegenerate }: MessageProps) {
   const isUser = message.role === 'user';
-
-  // Extract text content from message (handle both string and array formats)
   const getTextContent = (): string => {
-    if (typeof message.content === 'string') {
-      return message.content;
-    }
-    // If content is an array, extract all text blocks
+    if (typeof message.content === 'string') return message.content;
     const textBlocks = message.content.filter((block) => block.type === 'text');
-    return textBlocks.map((block) => block.text).join('\n');
+    return textBlocks.map((block) => (block as any).text).join('\n');
   };
-
   const textContent = getTextContent();
 
   return (
-    <div
-      className={`message ${isUser ? 'message-user' : 'message-assistant'}`}
-      role="article"
-      aria-label={`${isUser ? 'You' : 'Claude'} said`}
-    >
+    <div className={`message ${isUser ? 'message-user' : 'message-assistant'}`}>
       <div className="message-content">
-        <MessageActions
-          messageId={message.id}
-          content={textContent}
-          role={message.role}
-          onRegenerate={onRegenerate}
-        />
-
+        <MessageActions messageId={message.id} content={textContent} role={message.role} onRegenerate={onRegenerate} />
         <div className="message-text">
-          <span className="sr-only">{isUser ? 'You:' : 'Claude:'}</span>
           {message.isAnimating && message.isStreaming ? (
             <StreamingText text={textContent} isComplete={!message.isStreaming} speed={50} />
           ) : (
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                code({ node, className, children, ...props }) {
-                  const match = /language-(\w+)/.exec(className || '');
-                  const codeString = String(children).replace(/\n$/, '');
-                  const isBlock = !!match || codeString.includes('\n');
-
-                  return isBlock ? (
-                    <CodeBlock code={codeString} language={match ? match[1] : 'text'} />
-                  ) : (
-                    <code className={className} {...props}>
-                      {children}
-                    </code>
-                  );
+                pre({ children }) {
+                  const codeEl = children as any;
+                  const match = /language-(\w+)/.exec(codeEl?.props?.className ?? '');
+                  return <CodeBlock code={String(codeEl?.props?.children ?? '').replace(/\n$/, '')} language={match ? match[1] : 'text'} />;
                 },
-                // Custom text renderer to detect cell references
+                code({ className, children, ...props }) {
+                  return <code className={className} {...props}>{children}</code>;
+                },
                 p({ children }) {
-                  if (typeof children === 'string') {
-                    const { segments } = detectCellReferences(children);
-                    return (
-                      <p>
-                        {segments.map((segment, index) =>
-                          segment.type === 'cell' ? (
-                            <CellReference key={index} reference={segment.content} />
-                          ) : (
-                            <span key={index}>{segment.content}</span>
-                          )
-                        )}
-                      </p>
-                    );
-                  }
-                  return <p>{children}</p>;
+                  return (
+                    <p>
+                      {React.Children.map(children, (child) => {
+                        if (typeof child === 'string') {
+                          const { segments } = detectCellReferences(child);
+                          return segments.map((segment, index) => segment.type === 'cell' ? <CellReference key={index} reference={segment.content} /> : <span key={index}>{segment.content}</span>);
+                        }
+                        return child;
+                      })}
+                    </p>
+                  );
                 },
               }}
             >
@@ -87,11 +61,7 @@ export default function Message({ message, onRegenerate }: MessageProps) {
             </ReactMarkdown>
           )}
         </div>
-
-        {/* Display attached files below user messages */}
-        {isUser && message.attachments && message.attachments.length > 0 && (
-          <AttachmentThumbnails attachments={message.attachments} />
-        )}
+        {isUser && message.attachments && message.attachments.length > 0 && <AttachmentThumbnails attachments={message.attachments} />}
       </div>
     </div>
   );
