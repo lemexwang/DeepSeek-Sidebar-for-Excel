@@ -176,11 +176,7 @@ export default function ChatInterface({ apiKey: initialApiKey, onApiKeyChange }:
     <div className="chat-interface" role="main" aria-label="Chat with DeepSeek">
       <div className="chat-header" role="banner">
         <div className="header-icon">
-          <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="50" fill="#4D6BFE"/>
-            <path d="M72 35c-3-8-11-13-20-12-6 1-11 5-14 11-2 4-2 8-1 12 1 3 3 6 6 8 2 1 4 2 6 2h1c3 0 6-1 8-3 3-3 4-7 3-11-1-3-3-5-6-6-2-1-4 0-5 2s0 4 2 5c1 0 2 0 2-1 1-1 0-2-1-2h-1c0-1 1-2 2-2 2 0 3 2 4 4 0 3-1 6-3 7-2 2-5 2-7 1-2-1-4-3-5-6-1-3-1-6 1-9 2-5 6-8 11-9 7-1 14 3 16 10 3 8-1 16-8 20-4 2-9 3-13 2-6-1-11-5-14-11-4-7-3-16 2-22 5-7 13-11 22-10 4 0 8 2 11 4l3-4c-4-3-9-5-14-5-11-1-21 4-27 13-6 8-7 19-2 28 4 8 11 13 19 14 2 0 4 1 6 1 5 0 10-2 15-4 9-5 14-16 11-26z" fill="white"/>
-            <circle cx="68" cy="32" r="4" fill="#4DBBFE"/>
-          </svg>
+          <img src="/assets/icon-32.png" width="28" height="28" alt="DeepSeek" style={{ borderRadius: '6px' }} />
         </div>
         <div className="header-content">
           <h1 className="header-title">DeepSeek</h1>
@@ -220,10 +216,7 @@ export default function ChatInterface({ apiKey: initialApiKey, onApiKeyChange }:
         {messages.length === 0 ? (
           <div className="welcome-message">
             <div className="welcome-icon">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                <path d="M3 8h18M8 3v18" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
+              <img src="/assets/icon-80.png" width="48" height="48" alt="DeepSeek" style={{ borderRadius: '12px' }} />
             </div>
             <h2>Ready to help with your spreadsheet</h2>
             <p>Select cells in Excel and ask me anything—analyze data, create formulas, or explain patterns.</p>
