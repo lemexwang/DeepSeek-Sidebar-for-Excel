@@ -1,381 +1,203 @@
-<div align="center">
+# DeepSeek Excel Sidebar
 
-# Claude for Excel
+An AI-powered Excel add-in that brings DeepSeek directly into Microsoft Excel. Analyze data, write formulas, create charts, apply formatting, and automate spreadsheet tasks — all from a sidebar panel.
 
-**AI-powered Excel assistant powered by Anthropic's Claude**
+## Features
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18-blue?logo=react)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-5-646CFF?logo=vite)](https://vitejs.dev/)
-[![Anthropic Claude](https://img.shields.io/badge/Claude-3.5%20Sonnet-orange)](https://www.anthropic.com/)
+- Chat with DeepSeek inside Excel
+- Read and write cell data via natural language
+- 39 Excel tools: read/write ranges, create tables and charts, apply formulas, conditional formatting, pivot tables, data validation, and more
+- Smart context: automatically reads your selected cells and workbook structure
 
-[Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Security](#-security--privacy) • [Contributing](#-contributing)
+## Architecture
+
+```
+Excel (Office.js)  →  Vite dev server (https://localhost:3002)
+                               ↓ /v1/* proxy
+                    DeepSeek proxy (http://localhost:14002)
+                               ↓
+                    DeepSeek API (api.deepseek.com)
+```
+
+The local proxy (`proxy.py`) converts Anthropic SDK format to DeepSeek API format, enabling tool use and streaming.
 
 ---
 
-</div>
+## Installation
 
-An AI-powered Excel add-in that brings the power of Claude AI directly into your spreadsheets. Analyze data, generate formulas, format tables, and get intelligent assistance without leaving Excel.
+### Prerequisites
 
-<div align="center">
-
-**[📸 Demo Screenshot Coming Soon]**
-
-*Chat with Claude directly in Excel's sidebar • Context-aware assistance • Instant Excel tools*
-
-</div>
-
-## ✨ Features
-
-- 🤖 **Natural Language Interface** - Ask questions about your data in plain English
-- 📊 **Smart Data Analysis** - Automatic analysis of selected cells and ranges
-- ⚡ **Quick Tools Menu** - 17+ built-in Excel tools for common operations
-- 🎨 **Professional UI** - Clean, modern interface matching Excel's design
-- 🔒 **Privacy First** - Your API key stays local, data only sent to Anthropic
-- 📝 **Command Palette** - Quick access to 18 pre-built prompts with `/` commands
-- 🖼️ **Image Support** - Attach images and PDFs for analysis (up to 10 files)
-- 💾 **Context Aware** - Automatically includes selected Excel data in conversations
-- ⌨️ **Keyboard Shortcuts** - Fast navigation and actions
-- 🛠️ **Excel Tools** - Format tables, freeze panes, sort data, insert rows/columns, and more
-
-## 🚀 Quick Start
-
-| Workflow | Steps |
-|----------|-------|
-| **Analyze Data** | 1. Select cells in Excel<br>2. Type `/analyze` or ask "What patterns do you see?"<br>3. Get AI-powered insights |
-| **Generate Formula** | 1. Select your data range<br>2. Type `/formula` or describe what you need<br>3. Claude generates the formula |
-| **Format Table** | 1. Select data range<br>2. Click **⋮** menu → "Format as Table"<br>3. Instant professional formatting |
-| **Clean Data** | 1. Select messy data<br>2. Type `/clean` or describe issues<br>3. Get cleanup suggestions |
-| **Stop Generation** | Press the **Stop** button (appears during response) to cancel |
-
-## 📊 What You Can Do
-
-<table>
-<tr>
-<td width="50%">
-
-**📈 Data Analysis**
-- Pattern recognition
-- Statistical insights
-- Trend identification
-- Outlier detection
-
-**🧮 Formula Generation**
-- Complex calculations
-- VLOOKUP/XLOOKUP
-- Conditional formulas
-- Array formulas
-
-</td>
-<td width="50%">
-
-**🎨 Formatting & Styling**
-- Professional table formatting
-- Conditional formatting rules
-- Cell styling suggestions
-- Auto-fit columns/rows
-
-**🔧 Data Operations**
-- Clean and normalize data
-- Find and remove duplicates
-- Transpose data
-- Sort and filter
-
-</td>
-</tr>
-</table>
-
-## 🔒 Security & Privacy
-
-✅ **No hardcoded API keys** - You provide your own Anthropic API key
-✅ **Local storage only** - API key stored in Office document settings (never sent to external servers)
-✅ **No tracking** - No analytics, no telemetry, no data collection
-✅ **Direct API calls** - Communication goes directly to Anthropic's API
-✅ **Open source** - Full transparency, inspect the code yourself
-
-**Important:** Your Anthropic API key is stored locally in Excel's document settings and is never transmitted to any server except Anthropic's official API (api.anthropic.com).
-
-## 📋 Prerequisites
-
-- **Excel Desktop** (Windows or macOS)
-  - Windows: Excel 2016 or later
-  - macOS: Excel 2016 or later
 - **Node.js** 18+ and npm
-- **Anthropic API Key** - Get one at [console.anthropic.com](https://console.anthropic.com/account/keys)
+- **Python** 3.8+
+- **Microsoft Excel** (Mac or Windows, Microsoft 365)
+- A **DeepSeek API key** from [platform.deepseek.com](https://platform.deepseek.com/)
 
-## 🚀 Installation
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/heyimjames/excel-claude-sidebar.git
-cd excel-claude-sidebar
-```
-
-### 2. Install Dependencies
+### 1. Clone and install
 
 ```bash
+git clone https://github.com/lemexwang/DeepSeek-Sidebar-for-Excel.git
+cd DeepSeek-Sidebar-for-Excel
 npm install
 ```
 
-### 3. Generate SSL Certificate
+### 2. Install proxy dependencies (optional — needed for web search)
 
-Office Add-ins require HTTPS in development. Generate a self-signed certificate:
+```bash
+pip3 install ddgs
+```
+
+### 3. Trust the dev certificate
+
+The add-in runs on HTTPS localhost. Install the dev certificate once:
 
 ```bash
 npx office-addin-dev-certs install
 ```
 
-This creates a certificate in the `.certs` folder and installs it in your system's trust store.
+---
 
-### 4. Start Development Server
+## Running on Mac
 
-```bash
-npm run dev
-```
-
-This starts:
-- Vite dev server at `https://localhost:3000`
-- Hot module replacement (HMR) enabled
-- Source maps for debugging
-
-### 5. Sideload the Add-in
-
-#### macOS
-1. Open Excel
-2. Go to **Insert** > **Add-ins** > **My Add-ins**
-3. Choose **Add a Custom Add-in**
-4. Select the `manifest.xml` file from this project
-5. Click **OK**
-
-#### Windows
-1. Open Excel
-2. Go to **Insert** > **Add-ins** > **My Add-ins**
-3. Select **SHARED FOLDER**
-4. Browse to the folder containing `manifest.xml`
-5. Select the manifest and click **Insert**
-
-### 6. Configure API Key
-
-When you first open the add-in:
-1. Click **Show Claude** in the Excel ribbon
-2. Enter your Anthropic API key
-3. Click **Save API Key**
-
-Your key is saved locally in Excel's document settings.
-
-## 💡 Usage
-
-### Basic Chat
-
-1. Select cells in Excel (optional - provides context)
-2. Type your question in the input box
-3. Press **Enter** to send
-
-### Command Palette
-
-Type `/` in the input to open the command palette with 18 pre-built prompts:
-
-| Command | Description |
-|---------|-------------|
-| `/analyze` | Analyze selected data and provide insights |
-| `/summarize` | Create a summary of the data |
-| `/chart` | Get suggestions for chart types |
-| `/format` | Apply formatting to cells |
-| `/formula` | Generate Excel formulas |
-| `/explain` | Explain patterns in the data |
-| `/clean` | Clean up and normalize data |
-| `/sort` | Sort data recommendations |
-| `/filter` | Apply filtering suggestions |
-| `/conditional` | Create conditional formatting rules |
-| `/vlookup` | Generate VLOOKUP formulas |
-| `/table` | Convert range to structured table |
-| `/transpose` | Transpose rows and columns |
-| `/duplicate` | Find and remove duplicates |
-| `/calculate` | Perform calculations |
-| `/validate` | Add data validation rules |
-| `/merge` | Merge cells or data |
-| `/pivot` | Create pivot table suggestions |
-
-### Quick Tools Menu (⋮)
-
-Click the **three-dot menu** in the header for instant Excel actions:
-
-| Category | Tool | Description |
-|----------|------|-------------|
-| **Formatting** | AutoFit Columns & Rows | Auto-fit all columns and rows to content |
-| | Format as Table | Convert selection to a table |
-| | Clear Formatting | Remove all formatting from selection |
-| **Insert/Delete** | Insert Row Above | Insert new row above selection |
-| | Insert Column Left | Insert new column to the left |
-| | Delete Selected Rows | Delete the selected rows |
-| | Delete Selected Columns | Delete the selected columns |
-| **Freeze Panes** ✓ | Freeze Top Row | Keep top row visible when scrolling |
-| | Freeze First Column | Keep first column visible when scrolling |
-| | Unfreeze Panes | Remove all freeze panes |
-| **Sorting** | Sort Ascending | Sort selection A to Z |
-| | Sort Descending | Sort selection Z to A |
-| **Navigation** | Select All Data | Select all used cells in worksheet |
-| | Go to Cell A1 | Jump to the top-left cell |
-
-> ✓ = Toggleable tools show an orange checkmark when active
-
-### Image Attachments
-
-Attach images or PDFs for Claude to analyze:
-- Click the **📎 paperclip icon** to upload files
-- Or **drag and drop** files into the input area
-- Or **paste** images from clipboard (Cmd/Ctrl + V)
-- Supports: JPEG, PNG, GIF, WebP, PDF
-- Max 10 files per message, 5MB per image, 10MB per PDF
-
-### Keyboard Shortcuts
-
-| Shortcut (Mac) | Shortcut (Windows) | Action |
-|----------------|-------------------|--------|
-| `⌘K` | `Ctrl+K` | Focus message input |
-| `⌘L` | `Ctrl+L` | Clear chat history |
-| `⇧?` | `Shift+?` | Show keyboard shortcuts |
-| `Enter` | `Enter` | Send message |
-| `Shift+Enter` | `Shift+Enter` | New line in message |
-| `/` | `/` | Open command palette |
-| `Esc` | `Esc` | Clear input or close palette |
-
-## 🏗️ Project Structure
-
-```
-excel-claude-sidebar/
-├── src/
-│   └── taskpane/
-│       ├── components/      # React components
-│       │   ├── ChatInterface.tsx
-│       │   ├── MessageInput.tsx
-│       │   ├── Message.tsx
-│       │   ├── Settings.tsx
-│       │   ├── ToolsMenu.tsx
-│       │   └── ...
-│       ├── hooks/          # Custom React hooks
-│       │   ├── useClaudeChat.ts
-│       │   ├── useExcelContext.ts
-│       │   └── ...
-│       ├── lib/            # Utilities & types
-│       │   ├── anthropic.ts
-│       │   ├── commands.ts
-│       │   └── types.ts
-│       ├── styles/         # CSS files
-│       └── App.tsx         # Main app component
-├── assets/                 # Icons and images
-├── manifest.xml           # Office Add-in manifest
-├── vite.config.ts         # Vite configuration
-└── package.json
-```
-
-## 🛠️ Development
-
-### Available Scripts
+### Start the dev server
 
 ```bash
-npm run dev          # Start dev server with HMR
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
-npm run clean        # Remove dist folder
+export DEEPSEEK_API_KEY=sk-your-key-here
+./start.sh
 ```
 
-### Environment Variables
-
-Create a `.env` file for development (optional):
+Or pass the key inline:
 
 ```bash
-# Development only - for testing without Office
-VITE_ANTHROPIC_API_KEY=your_api_key_here
+DEEPSEEK_API_KEY=sk-your-key-here ./start.sh
 ```
 
-**Note:** In production, API keys are entered by users via the Settings UI and stored in Office document settings.
+The script starts both the proxy (port 14002) and the Vite dev server (port 3002).
 
-## 🔧 Troubleshooting
+### Sideload the add-in in Excel (Mac)
 
-### Certificate Issues
+1. Open **Microsoft Excel**
+2. Go to **Insert → Add-ins → My Add-ins**
+3. Click **Upload My Add-in** (bottom-left of the dialog)
+4. Select `manifest.xml` from this repo folder
+5. Click **Upload**
 
-If you see certificate warnings:
+The **Excel DeepSeek Sidebar** will appear. Click the button in the Home ribbon to open it.
 
-```bash
-# Reinstall certificate
-npx office-addin-dev-certs install --force
-```
-
-### Add-in Not Loading
-
-1. Check dev server is running (`npm run dev`)
-2. Verify HTTPS certificate is trusted
-3. Clear Office cache:
-   - macOS: `~/Library/Containers/com.microsoft.Excel/Data/Documents/wef`
-   - Windows: `%LOCALAPPDATA%\Microsoft\Office\16.0\Wef`
-4. Restart Excel
-
-### API Key Not Saving
-
-API keys are stored in Office document settings. If not saving:
-1. Make sure you have write permissions for the Excel file
-2. Try saving the Excel file first
-3. Re-enter the API key in Settings
-
-### Context Not Loading
-
-If Excel context isn't being captured:
-1. Select cells before sending message
-2. Check Console for errors (F12 in Excel)
-3. Try refreshing the add-in
-
-## 💰 API Usage & Costs
-
-This add-in uses Anthropic's Claude API. You're responsible for your own API usage and costs:
-
-- API calls are billed by Anthropic based on token usage
-- See [Anthropic Pricing](https://www.anthropic.com/pricing) for current rates
-- Monitor usage in your [Anthropic Console](https://console.anthropic.com)
-
-## 🤝 Contributing
-
-Contributions welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Test thoroughly
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-## 👨‍💻 Credits
-
-**Built by**
-- [James Frewin](https://twitter.com/jamesfrewin1)
-  - [Twitter](https://twitter.com/jamesfrewin1)
-  - [LinkedIn](https://linkedin.com/in/jamesfrewin)
-  - [GitHub](https://github.com/heyimjames)
-
-**Design by**
-- [OCTOBER Design Studio](https://www.octoberwip.com)
-
-## 📜 License
-
-MIT License - see LICENSE file for details
-
-## 🆘 Support
-
-- 🐛 **Issues**: [GitHub Issues](https://github.com/heyimjames/excel-claude-sidebar/issues)
-- 💬 **Questions**: [GitHub Discussions](https://github.com/heyimjames/excel-claude-sidebar/discussions)
-- 🐦 **Updates**: Follow [@jamesfrewin1](https://twitter.com/jamesfrewin1)
-
-## 🔗 Links
-
-- [Anthropic Console](https://console.anthropic.com)
-- [Office Add-ins Documentation](https://learn.microsoft.com/en-us/office/dev/add-ins/)
-- [Claude API Documentation](https://docs.anthropic.com/)
+> **Tip:** You only need to sideload once. Excel remembers the add-in between sessions as long as the dev server is running.
 
 ---
 
-**Disclaimer:** This is an unofficial third-party add-in. Not affiliated with Microsoft or Anthropic. Use at your own risk.
+## Running on Windows
+
+### Start the dev server
+
+In **PowerShell** or **Command Prompt**:
+
+```powershell
+$env:DEEPSEEK_API_KEY = "sk-your-key-here"
+bash ./start.sh
+```
+
+If you don't have bash, start the two services manually:
+
+**Terminal 1 — Proxy:**
+```powershell
+$env:DEEPSEEK_API_KEY = "sk-your-key-here"
+python proxy.py
+```
+
+**Terminal 2 — Dev server:**
+```powershell
+npm run dev
+```
+
+### Sideload the add-in in Excel (Windows) — Shared Folder method
+
+1. Create a folder anywhere, e.g. `C:\OfficeAddins\DeepSeekExcel`
+2. Copy `manifest.xml` into that folder
+3. In Excel, go to **File → Options → Trust Center → Trust Center Settings**
+4. Click **Trusted Add-in Catalogs**
+5. In **Catalog Url**, enter the folder path: `C:\OfficeAddins\DeepSeekExcel`
+6. Click **Add catalog**, check **Show in Menu**, click **OK**
+7. Restart Excel
+8. Go to **Insert → My Add-ins → Shared Folder tab**
+9. Select **Excel DeepSeek Sidebar** and click **Add**
+
+> **Alternative (Windows):** If you have `office-addin-debugging` installed, you can also run `npm start` which handles sideloading automatically.
+
+### Trust the HTTPS certificate (Windows)
+
+The Vite dev server uses a self-signed certificate. On first run:
+
+```powershell
+npx office-addin-dev-certs install
+```
+
+If you see SSL errors in the add-in, open `https://localhost:3002` in Edge or Chrome and click **Advanced → Proceed** to trust the cert.
+
+---
+
+## Configuration
+
+### API Key
+
+Enter your DeepSeek API key in the add-in's **Settings** panel (gear icon in the sidebar header). The key is stored in browser localStorage — it never leaves your machine except when calling the DeepSeek API.
+
+### Ports
+
+| Service | Port | Config location |
+|---------|------|-----------------|
+| Vite dev server | 3002 | `vite.config.ts` |
+| DeepSeek proxy | 14002 | `proxy.py` (`PROXY_PORT` env var) |
+
+To change the proxy port: `PROXY_PORT=15000 python3 proxy.py`
+
+---
+
+## Available Tools
+
+DeepSeek can use 39 Excel tools in this add-in:
+
+| Category | Tools |
+|----------|-------|
+| Read/Write | `read_range`, `write_range`, `get_selection`, `copy_range`, `clear_range` |
+| Workbook info | `get_workbook_info`, `manage_worksheet` |
+| Tables & structure | `create_table`, `create_pivot_table`, `merge_cells`, `freeze_panes` |
+| Charts | `create_chart`, `add_sparkline` |
+| Formulas | `apply_formula`, `create_named_range`, `calculate_statistics` |
+| Formatting | `format_range`, `apply_borders`, `set_alignment`, `autofit_columns`, `apply_conditional_formatting` |
+| Data operations | `sort_range`, `apply_autofilter`, `find_replace`, `remove_duplicates`, `transpose_range`, `text_to_columns` |
+| Rows & columns | `insert_rows`, `delete_rows`, `hide_unhide` |
+| Validation | `add_data_validation`, `check_duplicates` |
+| Annotations | `add_comment`, `add_hyperlink`, `protect_range` |
+| Analysis | `generate_expense_summary`, `convert_currency`, `export_to_csv`, `web_search` |
+
+---
+
+## Development
+
+```bash
+npm run dev      # Start dev server with hot reload
+npm run build    # Production build
+npm run lint     # ESLint
+```
+
+Logs are written to `/tmp/deepseek-proxy.log` and `/tmp/excel-addin-dev.log` when using `start.sh`.
+
+---
+
+## Troubleshooting
+
+**Add-in shows blank or "Add-in Error"**
+- Make sure the dev server is running: `curl -k https://localhost:3002`
+- Check dev server log: `tail -f /tmp/excel-addin-dev.log`
+
+**"Failed to fetch" or API errors**
+- Make sure the proxy is running: `curl http://localhost:14002`
+- Verify your `DEEPSEEK_API_KEY` is set correctly
+
+**Certificate errors on Mac**
+- Run `npx office-addin-dev-certs install` and restart Excel
+
+**Certificate errors on Windows**
+- Open `https://localhost:3002` in Edge, proceed past the warning, then reload the add-in

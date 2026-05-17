@@ -36,19 +36,19 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
               <path d="M4 24L24 34L44 24" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
             </svg>
           </div>
-          <h1>Welcome to Gemma for Excel</h1>
-          <p>Running locally via Gemma proxy — enter any value to continue</p>
+          <h1>Welcome to DeepSeek for Excel</h1>
+          <p>Enter your DeepSeek API key to get started</p>
         </div>
 
         <div className="setup-form">
           <Field
-            label="Anthropic API Key"
+            label="DeepSeek API Key"
             validationMessage={error}
             validationState={error ? 'error' : undefined}
           >
             <Input
               type="password"
-              placeholder="gemma-local"
+              placeholder="sk-..."
               value={apiKey}
               onChange={(_, data) => {
                 setApiKey(data.value);
@@ -71,13 +71,16 @@ export default function ApiKeySetup({ onSave }: ApiKeySetupProps) {
 
           <div className="setup-help">
             <p className="help-note">
-              This add-in connects to your local Gemma proxy at localhost:14001. Any value works as the key.
+              Your API key is stored locally and never sent to any server except DeepSeek's API.{' '}
+              <a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">
+                Get your DeepSeek API key →
+              </a>
             </p>
           </div>
         </div>
 
         <div className="setup-features">
-          <h2>What you can do with Claude</h2>
+          <h2>What you can do with DeepSeek</h2>
           <div className="features-grid">
             <div className="feature-card">
               <div className="feature-icon">📊</div>

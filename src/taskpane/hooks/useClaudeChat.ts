@@ -3,160 +3,372 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { ChatMessage, ImageAttachment, TextContent, ImageContent, DocumentContent } from '../lib/types';
 import type { ExcelContext } from './useExcelContext';
 import { useExcelTools } from './useExcelTools';
-import { useProposedEdits } from './useProposedEdits';
 import type { ToolCall } from '../components/ToolCallIndicator';
 
-function buildSystemPrompt(): string {
-  const date = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' });
-  return `You are an elite Excel AI assistant. You help users analyze data and automate spreadsheet tasks.
-
-TOOLS & WORKFLOW
-- propose_range_edit(range, values, reason): PREFERRED for all cell edits. Proposes changes for user review.
-- write_range(range, values): Direct write. Use only for brand new content or if user requested automatic mode.
-- read_range(range): Inspect cell data.
-- create_table, create_chart, apply_formula, etc.: Specialized actions.
-
-STRATEGY:
-1. When asked to "edit", "fix", or "update" cells:
-   a. First read_range to understand current state.
-   b. Use propose_range_edit to suggest the new values.
-2. Always provide a clear 'reason' in your proposal.
-3. Keep responses concise and focused on the data.
-
-Today's date: ${date}`;
-}
-
-const SYSTEM_PROMPT = buildSystemPrompt();
-
-export function useClaudeChat(apiKey: string, options?: { autoApply?: boolean }) {
+export function useClaudeChat(apiKey: string, options?: { apiEndpoint?: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([]);
   const [abortController, setAbortController] = useState<AbortController | null>(null);
-
-  const proposedEdits = useProposedEdits(async (edit) => {
-    // In Excel, we need to convert the Markdown Table back to a 2D array if the user edited it in the UI.
-    // For simplicity, we assume 'edit.newMarkdown' is what we want to write.
-    // If it's still a MD table, we parse it.
-    const rows = edit.newMarkdown.split('\n').filter(r => r.includes('|') && !r.includes('---'));
-    const values = rows.map(r => r.split('|').map(v => v.trim()).filter(v => v !== ''));
-    
-    const res = await executeTool('write_range', {
-      range: edit.anchorId,
-      values: values
-    });
-    return (res as any).success;
-  });
-
-  const { tools, executeTool } = useExcelTools({
-    onPropose: (p) => {
-      const id = proposedEdits.propose(p);
-      if (options?.autoApply) {
-        proposedEdits.accept(id);
-      }
-    }
-  });
+  const { tools, executeTool} = useExcelTools();
 
   const sendMessage = useCallback(
     async (content: string, excelContext?: ExcelContext, attachments?: ImageAttachment[]) => {
       if ((!content.trim() && !attachments?.length) || isLoading) return;
 
+      // Build message content (text + images/documents if provided)
+      let messageContent: string | Array<TextContent | ImageContent | DocumentContent>;
       let enhancedTextContent = content.trim();
+
+      // Enhance with Excel context if available
       if (excelContext && excelContext.hasData) {
-        enhancedTextContent += `\n\n[Excel Context: ${excelContext.address} on "${excelContext.sheetName}" (${excelContext.rowCount}×${excelContext.columnCount} cells)]`;
+        const contextInfo = `\n\n[Excel Context: Currently viewing ${excelContext.address} on sheet "${excelContext.sheetName}" (${excelContext.rowCount}×${excelContext.columnCount} cells)]`;
+        enhancedTextContent += contextInfo;
       }
 
+      // If we have attachments, build content blocks array
+      if (attachments && attachments.length > 0) {
+        const contentBlocks: Array<TextContent | ImageContent | DocumentContent> = [];
+
+        // Add text content first (if there is any)
+        if (enhancedTextContent) {
+          contentBlocks.push({
+            type: 'text',
+            text: enhancedTextContent,
+          });
+        }
+
+        // Add file content blocks (images or documents)
+        for (const attachment of attachments) {
+          if (attachment.fileType === 'document') {
+            // PDF document
+            contentBlocks.push({
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: attachment.mediaType as 'application/pdf',
+                data: attachment.data,
+              },
+            });
+          } else {
+            // Image
+            contentBlocks.push({
+              type: 'image',
+              source: {
+                type: attachment.type,
+                media_type: attachment.mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+                ...(attachment.type === 'base64'
+                  ? { data: attachment.data }
+                  : { url: attachment.data }),
+              },
+            });
+          }
+        }
+
+        messageContent = contentBlocks;
+      } else {
+        // No attachments, just text
+        messageContent = content.trim();
+      }
+
+      // Add user message (show original content to user, but send enhanced to Claude)
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
-        content: enhancedTextContent,
+        content: messageContent,
         attachments,
       };
 
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
 
+      // Create new abort controller for this request
       const controller = new AbortController();
       setAbortController(controller);
 
       try {
-        const anthropic = new Anthropic({ apiKey, baseURL: 'https://localhost:3002', dangerouslyAllowBrowser: true });
-        const conversationMessages = [...messages, userMessage].map((m) => ({ role: m.role, content: m.content }));
+        const anthropic = new Anthropic({
+          apiKey,
+          baseURL: options?.apiEndpoint || 'https://localhost:3002',
+          dangerouslyAllowBrowser: true,
+        });
+
+        // Prepare conversation history for Claude
+        const conversationMessages = [...messages, userMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+
+        // Generate ID for streaming message but don't create it yet
         const streamingMessageId = crypto.randomUUID();
         let messageCreated = false;
 
+        // Start streaming
         const stream = anthropic.messages.stream(
-          { model: 'deepseek-chat', max_tokens: 8192, system: SYSTEM_PROMPT, tools: tools as any, messages: conversationMessages as any },
+          {
+            model: 'deepseek-chat',
+            max_tokens: 4096,
+            system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\nToday's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
+            tools: tools as any,
+            messages: conversationMessages as any,
+          },
           { signal: controller.signal }
         );
 
+        // Handle stream events
         for await (const event of stream) {
           if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
             const text = (event.delta as any).text as string;
+            // Create the message on first text delta
             if (!messageCreated) {
-              setMessages((prev) => [...prev, { id: streamingMessageId, role: 'assistant', content: text, isStreaming: true, isAnimating: true }]);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: streamingMessageId,
+                  role: 'assistant',
+                  content: text,
+                  isStreaming: true,
+                  isAnimating: true,
+                },
+              ]);
               messageCreated = true;
             } else {
-              setMessages((prev) => prev.map((m) => m.id === streamingMessageId ? { ...m, content: m.content + text } : m));
+              // Update existing message
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamingMessageId ? { ...m, content: m.content + text } : m
+                )
+              );
             }
           }
         }
 
         let response = await stream.finalMessage();
         let fullTextContent = '';
-        for (const block of response.content) { if (block.type === 'text') fullTextContent += block.text; }
 
+        // Collect any text content from initial response
+        for (const block of response.content) {
+          if (block.type === 'text') {
+            fullTextContent += block.text;
+          }
+        }
+
+        // Handle tool use if needed
         while (response.stop_reason === 'tool_use') {
-          const toolUseBlocks = response.content.filter((block: any) => block.type === 'tool_use');
-          if (toolUseBlocks.length === 0) break;
-          conversationMessages.push({ role: 'assistant', content: response.content as any });
-          setActiveToolCalls(toolUseBlocks.map((block: any) => ({ id: block.id, name: block.name, status: 'running' as const })));
-
-          const toolResults = await Promise.all(
-            toolUseBlocks.map(async (toolUseBlock: any) => {
-              const result = await executeTool(toolUseBlock.name, toolUseBlock.input);
-              return { type: 'tool_result' as const, tool_use_id: toolUseBlock.id, content: JSON.stringify(result) };
-            })
+          // Find all tool_use blocks in the response
+          const toolUseBlocks = response.content.filter(
+            (block: any) => block.type === 'tool_use'
           );
 
-          setActiveToolCalls([]);
-          conversationMessages.push({ role: 'user', content: toolResults as any });
+          if (toolUseBlocks.length === 0) break;
 
+          // Add assistant message with tool_use to conversation history
+          conversationMessages.push({
+            role: 'assistant',
+            content: response.content as any,
+          });
+
+          // Add active tool calls to state
+          const newToolCalls: ToolCall[] = toolUseBlocks.map((block: any) => ({
+            id: block.id,
+            name: block.name,
+            status: 'running' as const,
+          }));
+          setActiveToolCalls(newToolCalls);
+
+          // Execute tools serially to avoid Excel.run race conditions
+          const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = [];
+          for (const toolUseBlock of toolUseBlocks) {
+            const result = await executeTool(toolUseBlock.name, toolUseBlock.input);
+            toolResults.push({
+              type: 'tool_result' as const,
+              tool_use_id: toolUseBlock.id,
+              content: JSON.stringify(result),
+            });
+          }
+
+          // Clear active tool calls after execution
+          setActiveToolCalls([]);
+
+          // Add tool results as user message
+          conversationMessages.push({
+            role: 'user',
+            content: toolResults as any,
+          });
+
+          // Continue streaming with tool results
           const continueStream = anthropic.messages.stream(
-            { model: 'deepseek-chat', max_tokens: 8192, system: SYSTEM_PROMPT, tools: tools as any, messages: conversationMessages as any },
+            {
+              model: 'deepseek-chat',
+              max_tokens: 4096,
+              system: `You are a helpful Excel assistant. Provide professional, concise, and friendly responses. Keep answers brief and to the point while maintaining a warm, approachable tone. Use emojis sparingly and only when they add clarity or emphasize important points. Focus on being practical and actionable in your advice.\n\nIMPORTANT: Avoid writing in huge text blocks. Break your responses into short, digestible paragraphs with clear paragraph breaks. Use formatting like bullet points, numbered lists, and headers to make information scannable. Keep individual paragraphs to 2-3 sentences maximum.\n\nEXCEL CONTEXT HANDLING:\n- When Excel context is provided (cells are selected), ALWAYS prioritize making changes to those selected cells unless the user explicitly specifies a different range (e.g., "change column A cells to...").\n- If the user says "edit these cells" or "change these", they are referring to the currently selected cells shown in the context.\n- When the user asks about selected cells (e.g., "look through these cells", "add information to these", "analyze this data"), FIRST use get_range_values to inspect the actual data before asking clarifying questions. The user has already told you which cells by selecting them - don\'t ask what cells to work with.\n- If the user has cleared the Excel context (no cells selected), do NOT assume which cells to modify - always ask for clarification or use tools like get_selection to determine the target range.\n\nCRITICAL - DECIMAL SEPARATOR CONVERSION:\nWhen users ask to "change commas to periods" or "convert commas to periods in numbers" (like "23,6" to "23.6"), they want to REPLACE the actual comma CHARACTER in the cell text. You MUST use the find_replace tool with find: "," and replace: ".". DO NOT use format_range or numberFormat - that only changes display, not actual values.\n\nToday's date: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}`,
+              tools: tools as any,
+              messages: conversationMessages as any,
+            },
             { signal: controller.signal }
           );
 
           for await (const event of continueStream) {
             if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
               fullTextContent += event.delta.text;
+
+              // Create the message on first text delta if not created yet
               if (!messageCreated) {
-                setMessages((prev) => [...prev, { id: streamingMessageId, role: 'assistant', content: fullTextContent, isStreaming: true, isAnimating: true }]);
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: streamingMessageId,
+                    role: 'assistant',
+                    content: fullTextContent,
+                    isStreaming: true,
+                    isAnimating: true,
+                  },
+                ]);
                 messageCreated = true;
               } else {
-                setMessages((prev) => prev.map((m) => m.id === streamingMessageId ? { ...m, content: fullTextContent } : m));
+                // Update existing message
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === streamingMessageId ? { ...m, content: fullTextContent } : m
+                  )
+                );
               }
             }
           }
+
           response = await continueStream.finalMessage();
+
+          // Only handle the no-streaming-text edge case (text deltas already accumulated above)
+          if (!messageCreated) {
+            for (const block of response.content) {
+              if (block.type === 'text') {
+                fullTextContent += block.text;
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: streamingMessageId,
+                    role: 'assistant',
+                    content: fullTextContent,
+                    isStreaming: true,
+                    isAnimating: true,
+                  },
+                ]);
+                messageCreated = true;
+                break;
+              }
+            }
+          }
         }
 
+        // Mark streaming as complete (only if message was created)
         if (messageCreated) {
-          setMessages((prev) => prev.map((m) => m.id === streamingMessageId ? { ...m, isStreaming: false, isAnimating: false } : m));
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamingMessageId ? { ...m, isStreaming: false, isAnimating: false } : m
+            )
+          );
+        }
+
+        // Remove image attachments from user message after successful analysis
+        // This discards temporary images after Claude has extracted the data
+        if (attachments && attachments.length > 0) {
+          setMessages((prev) =>
+            prev.map((m) => {
+              if (m.id === userMessage.id) {
+                // Convert content back to string if it was an array
+                const textContent =
+                  typeof m.content === 'string'
+                    ? m.content
+                    : m.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
+
+                return {
+                  ...m,
+                  content: textContent,
+                  attachments: undefined, // Remove attachments
+                };
+              }
+              return m;
+            })
+          );
         }
       } catch (error: any) {
         console.error('Chat error:', error);
+
+        // Check if it was aborted
+        if (error.name === 'AbortError' || controller.signal.aborted) {
+          // Clean up any streaming message
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.isStreaming ? { ...m, isStreaming: false, isAnimating: false } : m
+            )
+          );
+
+          // Add aborted message
+          const abortedMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: 'Response stopped by user.',
+          };
+          setMessages((prev) => [...prev, abortedMessage]);
+        } else {
+          // Add error message
+          const errorMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `I encountered an error: ${error.message || 'Unknown error'}. Please try again.`,
+          };
+
+          setMessages((prev) => [...prev, errorMessage]);
+        }
       } finally {
-        setIsLoading(false); setActiveToolCalls([]); setAbortController(null);
+        setIsLoading(false);
+        setActiveToolCalls([]);
+        setAbortController(null);
       }
     },
-    [messages, apiKey, executeTool, tools, isLoading, options, proposedEdits]
+    [messages, apiKey, executeTool, tools, isLoading]
   );
 
-  const clearMessages = useCallback(() => { setMessages([]); }, []);
-  const stopGeneration = useCallback(() => { if (abortController) { abortController.abort(); setAbortController(null); } }, [abortController]);
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  const stopGeneration = useCallback(() => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+  }, [abortController]);
+
+  const regenerateMessage = useCallback(
+    async (messageId: string) => {
+      // Find the message index
+      const messageIndex = messages.findIndex((m) => m.id === messageId);
+      if (messageIndex === -1 || messageIndex === 0) return;
+
+      // Remove messages from this point onwards
+      const messagesToKeep = messages.slice(0, messageIndex);
+      setMessages(messagesToKeep);
+
+      // Find the last user message
+      const lastUserMessage = [...messagesToKeep].reverse().find((m) => m.role === 'user');
+      if (lastUserMessage) {
+        const textContent = typeof lastUserMessage.content === 'string'
+          ? lastUserMessage.content
+          : lastUserMessage.content.filter((b) => b.type === 'text').map((b) => (b as any).text).join('\n');
+        await sendMessage(textContent);
+      }
+    },
+    [messages, sendMessage]
+  );
 
   return {
-    messages, isLoading, activeToolCalls, sendMessage, clearMessages, stopGeneration, proposedEdits,
+    messages,
+    isLoading,
+    activeToolCalls,
+    sendMessage,
+    clearMessages,
+    regenerateMessage,
+    stopGeneration,
   };
 }

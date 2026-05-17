@@ -275,7 +275,7 @@ export default function MessageInput({ value, onChange, onSend, onStop, disabled
   };
 
   return (
-    <div className="message-input-container" role="form" aria-label="Send message to Claude">
+    <div className="message-input-container" role="form" aria-label="Send message to DeepSeek">
       {showCommandPalette && (
         <CommandPalette
           query={commandQuery}
@@ -334,7 +334,7 @@ export default function MessageInput({ value, onChange, onSend, onStop, disabled
         onDrop={handleDrop}
       >
         <label htmlFor="message-textarea" className="sr-only">
-          Message to Claude
+          Message to DeepSeek
         </label>
 
         {/* Hidden file input */}

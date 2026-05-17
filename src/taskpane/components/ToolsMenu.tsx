@@ -284,7 +284,7 @@ export default function ToolsMenu({ messages = [] }: ToolsMenuProps) {
       // Format all messages as text
       const chatText = messages
         .map((msg) => {
-          const role = msg.role === 'user' ? 'User' : 'Claude';
+          const role = msg.role === 'user' ? 'User' : 'DeepSeek';
           const content = typeof msg.content === 'string'
             ? msg.content
             : msg.content.filter((block) => block.type === 'text').map((block) => block.text).join('\n');
